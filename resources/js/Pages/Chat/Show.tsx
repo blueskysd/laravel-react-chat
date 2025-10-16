@@ -10,6 +10,7 @@ interface Message {
     created_at: string;
     is_sender: boolean;
     read_at: string | null;
+    is_deleted?: boolean;
 }
 
 interface User {
@@ -45,6 +46,14 @@ export default function Show({ selectedUser, messages, users }: Props) {
             preserveScroll: true,
             onSuccess: () => reset('content'),
         });
+    };
+
+    const deleteMessage = (messageId: number) => {
+        if (confirm('Are you sure you want to delete this message?')) {
+            router.delete(route('messages.destroy', messageId), {
+                preserveScroll: true,
+            });
+        }
     };
 
     const formatTime = (dateString: string) => {
@@ -137,35 +146,75 @@ export default function Show({ selectedUser, messages, users }: Props) {
                                                         {msgs.map((message) => (
                                                             <div
                                                                 key={message.id}
-                                                                className={`flex ${
+                                                                className={`group flex ${
                                                                     message.is_sender
                                                                         ? 'justify-end'
                                                                         : 'justify-start'
                                                                 }`}
                                                             >
-                                                                <div
-                                                                    className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                                                                        message.is_sender
-                                                                            ? 'bg-blue-600 text-white'
-                                                                            : 'bg-gray-100 text-gray-900'
-                                                                    }`}
-                                                                >
-                                                                    <p className="break-words">
-                                                                        {
-                                                                            message.content
-                                                                        }
-                                                                    </p>
-                                                                    <p
-                                                                        className={`mt-1 text-xs ${
-                                                                            message.is_sender
-                                                                                ? 'text-blue-100'
-                                                                                : 'text-gray-500'
+                                                                <div className="flex max-w-[70%] items-start gap-2">
+                                                                    <div
+                                                                        className={`rounded-lg px-4 py-2 ${
+                                                                            message.is_deleted
+                                                                                ? message.is_sender
+                                                                                    ? 'bg-gray-300 text-gray-600'
+                                                                                    : 'bg-gray-200 text-gray-600'
+                                                                                : message.is_sender
+                                                                                  ? 'bg-blue-600 text-white'
+                                                                                  : 'bg-gray-100 text-gray-900'
                                                                         }`}
                                                                     >
-                                                                        {formatTime(
-                                                                            message.created_at,
+                                                                        <p
+                                                                            className={`break-words ${
+                                                                                message.is_deleted
+                                                                                    ? 'italic'
+                                                                                    : ''
+                                                                            }`}
+                                                                        >
+                                                                            {
+                                                                                message.content
+                                                                            }
+                                                                        </p>
+                                                                        <p
+                                                                            className={`mt-1 text-xs ${
+                                                                                message.is_deleted
+                                                                                    ? 'text-gray-500'
+                                                                                    : message.is_sender
+                                                                                      ? 'text-blue-100'
+                                                                                      : 'text-gray-500'
+                                                                            }`}
+                                                                        >
+                                                                            {formatTime(
+                                                                                message.created_at,
+                                                                            )}
+                                                                        </p>
+                                                                    </div>
+                                                                    {message.is_sender &&
+                                                                        !message.is_deleted && (
+                                                                            <button
+                                                                                onClick={() =>
+                                                                                    deleteMessage(
+                                                                                        message.id,
+                                                                                    )
+                                                                                }
+                                                                                className="mt-2 opacity-0 transition-opacity group-hover:opacity-100"
+                                                                                title="Delete message"
+                                                                            >
+                                                                                <svg
+                                                                                    className="h-4 w-4 text-red-500 hover:text-red-700"
+                                                                                    fill="none"
+                                                                                    stroke="currentColor"
+                                                                                    viewBox="0 0 24 24"
+                                                                                >
+                                                                                    <path
+                                                                                        strokeLinecap="round"
+                                                                                        strokeLinejoin="round"
+                                                                                        strokeWidth="2"
+                                                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                                                    />
+                                                                                </svg>
+                                                                            </button>
                                                                         )}
-                                                                    </p>
                                                                 </div>
                                                             </div>
                                                         ))}

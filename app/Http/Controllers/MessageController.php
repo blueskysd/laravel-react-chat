@@ -68,7 +68,7 @@ class MessageController extends Controller
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 
-        // Get all messages between current user and selected user
+        // Get all messages between current user and selected user (including soft deleted)
         $messages = Message::where(function ($query) use ($currentUser, $user) {
             $query->where('sender_id', $currentUser->id)
                 ->where('receiver_id', $user->id);
@@ -77,16 +77,18 @@ class MessageController extends Controller
             $query->where('sender_id', $user->id)
                 ->where('receiver_id', $currentUser->id);
         })
+        ->withTrashed()
         ->with(['sender', 'receiver'])
         ->orderBy('created_at', 'asc')
         ->get()
         ->map(function ($message) use ($currentUser) {
             return [
                 'id' => $message->id,
-                'content' => $message->content,
+                'content' => $message->trashed() ? '[deleted]' : $message->content,
                 'created_at' => $message->created_at,
                 'is_sender' => $message->sender_id === $currentUser->id,
                 'read_at' => $message->read_at,
+                'is_deleted' => $message->trashed(),
             ];
         });
 
@@ -151,5 +153,28 @@ class MessageController extends Controller
         });
 
         return response()->json($messages);
+    }
+
+    /**
+     * Soft delete a message (only sender can delete their own messages)
+     */
+    public function destroy(Message $message)
+    {
+        $currentUser = auth()->user();
+
+        // Check if the current user is the sender of the message
+        if ($message->sender_id !== $currentUser->id) {
+            abort(403, 'You can only delete your own messages.');
+        }
+
+        // Check if message is already deleted
+        if ($message->trashed()) {
+            abort(400, 'Message is already deleted.');
+        }
+
+        // Soft delete the message
+        $message->delete();
+
+        return back();
     }
 }
