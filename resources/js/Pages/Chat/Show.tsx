@@ -4,6 +4,7 @@ import TextInput from '@/Components/TextInput';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEventHandler, useEffect, useRef } from 'react';
 import { FlagIcon } from '@heroicons/react/24/outline'
+import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
     id: number;
@@ -47,6 +48,9 @@ export default function Show({ selectedUser, messages, users }: Props) {
         e.preventDefault();
         post(route('messages.store'), {
             preserveScroll: true,
+            headers: {
+                'Idempotency-Key': uuidv4(),
+            },
             onSuccess: () => reset('content'),
         });
     };
@@ -175,41 +179,77 @@ export default function Show({ selectedUser, messages, users }: Props) {
                                                                                 <FlagIcon className="h-4 w-4 text-amber-500 hover:text-amber-700" />
                                                                             </button>
                                                                         )}
-                                                                    <div
-                                                                        className={`rounded-lg px-4 py-2 ${
-                                                                            message.is_deleted
-                                                                                ? message.is_sender
-                                                                                    ? 'bg-gray-300 text-gray-600'
-                                                                                    : 'bg-gray-200 text-gray-600'
-                                                                                : message.is_sender
-                                                                                  ? 'bg-blue-600 text-white'
-                                                                                  : 'bg-gray-100 text-gray-900'
-                                                                        }`}
-                                                                    >
-                                                                        <p
-                                                                            className={`break-words ${
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <div
+                                                                            className={`rounded-lg px-4 py-2 ${
                                                                                 message.is_deleted
-                                                                                    ? 'italic'
-                                                                                    : ''
+                                                                                    ? message.is_sender
+                                                                                        ? 'bg-gray-300 text-gray-600'
+                                                                                        : 'bg-gray-200 text-gray-600'
+                                                                                    : message.status === 'reported'
+                                                                                      ? message.is_sender
+                                                                                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                                                                          : 'bg-gray-200 text-gray-600'
+                                                                                      : message.is_sender
+                                                                                        ? 'bg-blue-600 text-white'
+                                                                                        : 'bg-gray-100 text-gray-900'
                                                                             }`}
                                                                         >
-                                                                            {
-                                                                                message.content
-                                                                            }
-                                                                        </p>
-                                                                        <p
-                                                                            className={`mt-1 text-xs ${
-                                                                                message.is_deleted
-                                                                                    ? 'text-gray-500'
-                                                                                    : message.is_sender
-                                                                                      ? 'text-blue-100'
-                                                                                      : 'text-gray-500'
-                                                                            }`}
-                                                                        >
-                                                                            {formatTime(
-                                                                                message.created_at,
+                                                                            <p
+                                                                                className={`break-words ${
+                                                                                    message.is_deleted ||
+                                                                                    (message.status ===
+                                                                                        'reported' &&
+                                                                                        !message.is_sender)
+                                                                                        ? 'italic'
+                                                                                        : ''
+                                                                                }`}
+                                                                            >
+                                                                                {
+                                                                                    message.content
+                                                                                }
+                                                                            </p>
+                                                                            <p
+                                                                                className={`mt-1 text-xs ${
+                                                                                    message.is_deleted
+                                                                                        ? 'text-gray-500'
+                                                                                        : message.status ===
+                                                                                            'reported'
+                                                                                          ? message.is_sender
+                                                                                              ? 'text-amber-700'
+                                                                                              : 'text-gray-500'
+                                                                                          : message.is_sender
+                                                                                            ? 'text-blue-100'
+                                                                                            : 'text-gray-500'
+                                                                                }`}
+                                                                            >
+                                                                                {formatTime(
+                                                                                    message.created_at,
+                                                                                )}
+                                                                            </p>
+                                                                        </div>
+                                                                        {message.is_sender &&
+                                                                            message.status ===
+                                                                                'reported' && (
+                                                                                <div className="flex items-center gap-1 px-2 text-xs text-amber-700">
+                                                                                    <svg
+                                                                                        className="h-3 w-3"
+                                                                                        fill="none"
+                                                                                        stroke="currentColor"
+                                                                                        viewBox="0 0 24 24"
+                                                                                    >
+                                                                                        <path
+                                                                                            strokeLinecap="round"
+                                                                                            strokeLinejoin="round"
+                                                                                            strokeWidth="2"
+                                                                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                                                                        />
+                                                                                    </svg>
+                                                                                    <span>
+                                                                                        [Reported: pending moderation]
+                                                                                    </span>
+                                                                                </div>
                                                                             )}
-                                                                        </p>
                                                                     </div>
                                                                     {message.is_sender &&
                                                                         !message.is_deleted && (

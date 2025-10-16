@@ -119,6 +119,64 @@ class MessageController extends Controller
     }
 
     /**
+     * Display chat with a specific user
+     */
+    //TODO: combine with show() above to avoid code duplication
+    public function poll(User $user)
+    {
+        $currentUser = auth()->user();
+
+        // Mark all messages from this user as read
+        Message::where('sender_id', $user->id)
+            ->where('receiver_id', $currentUser->id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        // Get all messages between current user and selected user (including soft deleted)
+        $messages = Message::where(function ($query) use ($currentUser, $user) {
+            $query->where('sender_id', $currentUser->id)
+                ->where('receiver_id', $user->id);
+        })
+            ->orWhere(function ($query) use ($currentUser, $user) {
+                $query->where('sender_id', $user->id)
+                    ->where('receiver_id', $currentUser->id);
+            })
+            ->withTrashed()
+            ->with(['sender', 'receiver'])
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($message) use ($currentUser) {
+                $isReported = $message->status === 'reported';
+                $content = $message->content;
+
+                // Handle content display based on status
+                if ($message->trashed()) {
+                    $content = '[deleted]';
+                } elseif ($isReported && $message->sender_id !== $currentUser->id) {
+                    // Non-sender sees reported messages as flagged
+                    $content = '[flagged for moderation]';
+                }
+
+                return [
+                    'id' => $message->id,
+                    'content' => $content,
+                    'created_at' => $message->created_at,
+                    'is_sender' => $message->sender_id === $currentUser->id,
+                    'read_at' => $message->read_at,
+                    'is_deleted' => $message->trashed(),
+                    'status' => $message->status,
+                ];
+            });
+
+        // Get all users for the sidebar
+        $users = User::where('id', '!=', $currentUser->id)->get();
+
+        return response()->json([
+            'messages' => $messages,
+        ]);
+    }
+
+    /**
      * Send a message to a user
      */
     public function store(Request $request)
@@ -126,13 +184,44 @@ class MessageController extends Controller
         $validated = $request->validate([
             'receiver_id' => 'required|exists:users,id',
             'content' => 'required|string|max:5000',
+            'idempotency_key' => 'nullable|string|max:64',
         ]);
 
-        $message = Message::create([
-            'sender_id' => auth()->id(),
-            'receiver_id' => $validated['receiver_id'],
-            'content' => $validated['content'],
-        ]);
+        // Use a transaction to ensure idempotency
+        DB::transaction(function () use ($validated) {
+            // Check for existing message with the same idempotency key
+            if (!empty($validated['idempotency_key'])) {
+                $existingMessage = Message::where('sender_id', auth()->id())
+                    ->where('idempotency_key', $validated['idempotency_key'])
+                    ->first();
+                if ($existingMessage) {
+                    return response()->json($existingMessage, 200); //Message already stored, do nothing
+                }
+
+                try {
+                    $msg = Message::create([
+                        'sender_id' => auth()->id(),
+                        'receiver_id' => $validated['receiver_id'],
+                        'content' => $validated['content'],
+                        'idempotency_key' => $validated['idempotency_key'],
+                    ]);
+                    return response()->json($msg, 201);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // unique hit: fetch the already-created one and return it
+                    $dupe = Message::where([
+                        'sender_id' => auth()->id(), 'idempotency_key' => $validated['idempotency_key']
+                    ])->firstOrFail();
+                    return response()->json($dupe, 200);
+                }
+            }
+
+            $message = Message::create([
+                'sender_id' => auth()->id(),
+                'receiver_id' => $validated['receiver_id'],
+                'content' => $validated['content'],
+            ]);
+            return response()->json($message, 201);
+        });
 
         return back();
     }

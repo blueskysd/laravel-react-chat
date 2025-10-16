@@ -27,10 +27,12 @@ Route::middleware('auth')->group(function () {
     // Chat routes
     Route::get('/chat', [MessageController::class, 'index'])->name('chat.index');
     Route::get('/chat/{user}', [MessageController::class, 'show'])->name('chat.show');
+    Route::get('/api/chat/{user}', [MessageController::class, 'poll'])->name('chat.poll');
     Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
     Route::delete('/messages/{message}', [MessageController::class, 'destroy'])->name('messages.destroy');
     Route::get('/messages/{user}', [MessageController::class, 'getMessages'])->name('messages.get');
     Route::post('/messages/{message}/report', [MessageController::class, 'report'])->name('messages.report');
+
 });
 
 require __DIR__.'/auth.php';
