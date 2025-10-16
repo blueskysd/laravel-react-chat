@@ -30,6 +30,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
     Route::delete('/messages/{message}', [MessageController::class, 'destroy'])->name('messages.destroy');
     Route::get('/messages/{user}', [MessageController::class, 'getMessages'])->name('messages.get');
+    Route::post('/messages/{message}/report', [MessageController::class, 'report'])->name('messages.report');
 });
 
 require __DIR__.'/auth.php';

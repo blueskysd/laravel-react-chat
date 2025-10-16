@@ -82,13 +82,25 @@ class MessageController extends Controller
         ->orderBy('created_at', 'asc')
         ->get()
         ->map(function ($message) use ($currentUser) {
+            $isReported = $message->status === 'reported';
+            $content = $message->content;
+
+            // Handle content display based on status
+            if ($message->trashed()) {
+                $content = '[deleted]';
+            } elseif ($isReported && $message->sender_id !== $currentUser->id) {
+                // Non-sender sees reported messages as flagged
+                $content = '[flagged for moderation]';
+            }
+
             return [
                 'id' => $message->id,
-                'content' => $message->trashed() ? '[deleted]' : $message->content,
+                'content' => $content,
                 'created_at' => $message->created_at,
                 'is_sender' => $message->sender_id === $currentUser->id,
                 'read_at' => $message->read_at,
                 'is_deleted' => $message->trashed(),
+                'status' => $message->status,
             ];
         });
 
@@ -174,6 +186,23 @@ class MessageController extends Controller
 
         // Soft delete the message
         $message->delete();
+
+        return back();
+    }
+
+    /**
+     * Report a message for moderation
+     */
+    public function report(Message $message)
+    {
+        $currentUser = auth()->user();
+
+        // Prevent users from reporting their own messages
+        if ($message->sender_id === $currentUser->id) {
+            abort(400, 'You cannot report your own message.');
+        }
+
+        $message->report($currentUser->id);
 
         return back();
     }

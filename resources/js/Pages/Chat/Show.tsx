@@ -3,6 +3,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEventHandler, useEffect, useRef } from 'react';
+import { FlagIcon } from '@heroicons/react/24/outline'
 
 interface Message {
     id: number;
@@ -11,6 +12,8 @@ interface Message {
     is_sender: boolean;
     read_at: string | null;
     is_deleted?: boolean;
+    is_reported?: boolean;
+    status?: string;
 }
 
 interface User {
@@ -53,6 +56,11 @@ export default function Show({ selectedUser, messages, users }: Props) {
             router.delete(route('messages.destroy', messageId), {
                 preserveScroll: true,
             });
+        }
+    };
+    const reportMessage = (messageId: number) => {
+        if (confirm('Are you sure you want to report this message to a moderator?')) {
+            router.post(route('messages.report', messageId), {}, { preserveScroll: true });
         }
     };
 
@@ -153,6 +161,20 @@ export default function Show({ selectedUser, messages, users }: Props) {
                                                                 }`}
                                                             >
                                                                 <div className="flex max-w-[70%] items-start gap-2">
+                                                                    {!message.is_sender &&
+                                                                        !message.is_deleted && (
+                                                                            <button
+                                                                                onClick={() =>
+                                                                                    reportMessage(
+                                                                                        message.id,
+                                                                                    )
+                                                                                }
+                                                                                className="mt-2 opacity-0 transition-opacity group-hover:opacity-100"
+                                                                                title="Report message"
+                                                                            >
+                                                                                <FlagIcon className="h-4 w-4 text-amber-500 hover:text-amber-700" />
+                                                                            </button>
+                                                                        )}
                                                                     <div
                                                                         className={`rounded-lg px-4 py-2 ${
                                                                             message.is_deleted
