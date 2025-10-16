@@ -100,6 +100,7 @@ class MessageController extends Controller
                 'is_sender' => $message->sender_id === $currentUser->id,
                 'read_at' => $message->read_at,
                 'is_deleted' => $message->trashed(),
+                'is_reported' => $message->status === 'reported' ?? false,
                 'status' => $message->status,
             ];
         });
@@ -164,6 +165,7 @@ class MessageController extends Controller
                     'is_sender' => $message->sender_id === $currentUser->id,
                     'read_at' => $message->read_at,
                     'is_deleted' => $message->trashed(),
+                    'is_reported' => $message->status === 'reported' ?? false,
                     'status' => $message->status,
                 ];
             });

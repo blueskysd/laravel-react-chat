@@ -35,6 +35,8 @@ export default function Show({ selectedUser, messages, users }: Props) {
         receiver_id: selectedUser.id,
         content: '',
     });
+    // local copy so polling can update the list
+    const [messagesState, setMessagesState] = useState<Message[]>(messages)
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -42,7 +44,25 @@ export default function Show({ selectedUser, messages, users }: Props) {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messagesState]);
+
+    useEffect(() => {
+        setMessagesState(messages)
+    }, [selectedUser.id, messages])
+
+    useEffect(() => {
+        const id = setInterval(fetchMessages, 10_000)
+        return () => clearInterval(id)
+    }, [selectedUser.id]) // restart when switching person
+
+    //only scroll if new message added
+    const prevCountRef = useRef<number>(messagesState.length)
+    useEffect(() => {
+        if (messagesState.length > prevCountRef.current) {
+            scrollToBottom()
+        }
+        prevCountRef.current = messagesState.length
+    }, [messagesState])
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -54,6 +74,23 @@ export default function Show({ selectedUser, messages, users }: Props) {
             onSuccess: () => reset('content'),
         });
     };
+
+    const fetchMessages = async () => {
+        try {
+            // If you registered a named route like Route::get('/api/chat/{user}/messages'...)->name('chat.fetch')
+            // const res = await fetch(route('chat.fetch', selectedUser.id), { headers: { Accept: 'application/json' } })
+
+            // Or a plain URL endpoint:
+            const res = await fetch(`/api/chat/${selectedUser.id}/messages`, {
+                headers: { Accept: 'application/json' },
+            })
+            if (!res.ok) throw new Error('Network error')
+            const data = await res.json() as { messages: Message[] }
+            setMessagesState(data.messages)
+        } catch (e) {
+            console.error('Polling failed', e)
+        }
+    }
 
     const deleteMessage = (messageId: number) => {
         if (confirm('Are you sure you want to delete this message?')) {
@@ -96,7 +133,7 @@ export default function Show({ selectedUser, messages, users }: Props) {
     };
 
     // Group messages by date
-    const groupedMessages = messages.reduce(
+    const groupedMessages = messagesState.reduce(
         (groups, message) => {
             const date = new Date(message.created_at).toDateString();
             if (!groups[date]) {
@@ -165,20 +202,20 @@ export default function Show({ selectedUser, messages, users }: Props) {
                                                                 }`}
                                                             >
                                                                 <div className="flex max-w-[70%] items-start gap-2">
-                                                                    {!message.is_sender &&
-                                                                        !message.is_deleted && (
+                                                                    {!message.is_sender ? (
+                                                                        message.is_deleted || message.is_reported ? (
+                                                                            // spacer keeps layout even when hidden
+                                                                            <div className="mt-2 w-4 h-4" />
+                                                                        ) : (
                                                                             <button
-                                                                                onClick={() =>
-                                                                                    reportMessage(
-                                                                                        message.id,
-                                                                                    )
-                                                                                }
+                                                                                onClick={() => reportMessage(message.id)}
                                                                                 className="mt-2 opacity-0 transition-opacity group-hover:opacity-100"
                                                                                 title="Report message"
                                                                             >
                                                                                 <FlagIcon className="h-4 w-4 text-amber-500 hover:text-amber-700" />
                                                                             </button>
-                                                                        )}
+                                                                        )
+                                                                    ) : null}
                                                                     <div className="flex flex-col gap-1">
                                                                         <div
                                                                             className={`rounded-lg px-4 py-2 ${
@@ -251,14 +288,13 @@ export default function Show({ selectedUser, messages, users }: Props) {
                                                                                 </div>
                                                                             )}
                                                                     </div>
-                                                                    {message.is_sender &&
-                                                                        !message.is_deleted && (
+                                                                    {message.is_sender ? (
+                                                                        message.is_deleted ? (
+                                                                            // spacer to keep layout aligned when delete button is hidden
+                                                                            <div className="mt-2 w-4 h-4" />
+                                                                        ) : (
                                                                             <button
-                                                                                onClick={() =>
-                                                                                    deleteMessage(
-                                                                                        message.id,
-                                                                                    )
-                                                                                }
+                                                                                onClick={() => deleteMessage(message.id)}
                                                                                 className="mt-2 opacity-0 transition-opacity group-hover:opacity-100"
                                                                                 title="Delete message"
                                                                             >
@@ -276,7 +312,8 @@ export default function Show({ selectedUser, messages, users }: Props) {
                                                                                     />
                                                                                 </svg>
                                                                             </button>
-                                                                        )}
+                                                                        )
+                                                                    ) : null}
                                                                 </div>
                                                             </div>
                                                         ))}
